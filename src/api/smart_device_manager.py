@@ -39,6 +39,8 @@ DEFAULT_BROADCAST = "255.255.255.255"
 NULL_IP = "X.X.X.X"
 HS100 = "hs100"
 UNKNOWN = "UNKNOWN"
+ON = "ON"
+OFF = "OFF"
 
 CODE_200 = "200"
 CODE_400 = "400"
@@ -127,6 +129,15 @@ async def turn_off_hs100(device: Optional[Device] = None):
         device = await get_hs100_device()
     if isinstance(device, Device):
         await device.turn_off()
+
+
+async def get_hs100_on_state(device: Optional[Device] = None):
+    if device is None:
+        device = await get_hs100_device()
+    s = f"{HS100}: "
+    if isinstance(device, Device):
+        return f"{s}ON" if device.is_on else f"{s}OFF"
+    return f"{s}UNKNOWN STATE"
 
 
 def load_config(json_config_path: pathlib.Path = DEFAULT_CONFIG_PATH):

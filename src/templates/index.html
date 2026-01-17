@@ -24,6 +24,7 @@
 
         .container {
             display: flex;
+            flex-direction: column;
             gap: 20px;
         }
 
@@ -56,6 +57,11 @@
             color: white;
         }
 
+        .state-button {
+            background-color:lightskyblue;
+            color: black;
+        }
+
         .status {
             color: white;
             font-family: 'Courier New', monospace;
@@ -70,6 +76,7 @@
         <div class="container">
             <button class="on-button" onclick="turnOn()">ON</button>
             <button class="off-button" onclick="turnOff()">OFF</button>
+            <button class="state-button" onclick="getState()">STATE</button>
         </div>
         <div class="status" id="status"></div>
     </div>
@@ -94,6 +101,18 @@
                 }
             } catch (error) {
                 document.getElementById('status').textContent = 'Error: Could not turn off light';
+            }
+        }
+
+        async function getState() {
+            try {
+                const response = await fetch('/hs100_state');
+                if (response.ok) {
+                    const text = await response.text();
+                    document.getElementById('status').textContent = text;
+                }
+            } catch (error) {
+                document.getElementById('status').textContent = 'Error fetching status. Try again later.'
             }
         }
     </script>

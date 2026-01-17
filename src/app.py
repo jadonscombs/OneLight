@@ -14,7 +14,8 @@ from markupsafe import escape
 from api.smart_device_manager import (
     ping_hs100_device,
     turn_on_hs100,
-    turn_off_hs100
+    turn_off_hs100,
+    get_hs100_on_state
 )
 
 
@@ -67,6 +68,11 @@ async def turn_off():
 @app.route("/hs100_status")
 async def hs100_status():
     return await ping_hs100_device()
+
+
+@app.route("/hs100_state")
+async def hs100_state():
+    return await get_hs100_on_state()
 
 
 # Development -- make safer adjustments later
