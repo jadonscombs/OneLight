@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project OneLight</title>
+    <style>
+        body {
+            background-color: rgb(29, 29, 36);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        .wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 30px;
+        }
+
+        .container {
+            display: flex;
+            gap: 20px;
+        }
+
+        button {
+            padding: 15px 40px;
+            font-size: 18px;
+            font-weight: bold;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.5);
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        button:active {
+            opacity: 0.8;
+        }
+
+        .on-button {
+            background-color: rgb(204, 214, 90);
+            color: black;
+        }
+
+        .off-button {
+            background-color: rgb(163, 77, 77);
+            color: white;
+        }
+
+        .status {
+            color: white;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            min-height: 24px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <div class="container">
+            <button class="on-button" onclick="turnOn()">ON</button>
+            <button class="off-button" onclick="turnOff()">OFF</button>
+        </div>
+        <div class="status" id="status"></div>
+    </div>
+
+    <script>
+        async function turnOn() {
+            try {
+                const response = await fetch('/on');
+                if (response.ok) {
+                    document.getElementById('status').textContent = 'The light is on.';
+                }
+            } catch (error) {
+                document.getElementById('status').textContent = 'Error: Could not turn on light';
+            }
+        }
+
+        async function turnOff() {
+            try {
+                const response = await fetch('/off');
+                if (response.ok) {
+                    document.getElementById('status').textContent = 'The light is off.';
+                }
+            } catch (error) {
+                document.getElementById('status').textContent = 'Error: Could not turn off light';
+            }
+        }
+    </script>
+</body>
+</html>

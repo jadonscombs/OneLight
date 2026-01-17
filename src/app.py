@@ -8,7 +8,7 @@ import asyncio
 import logging
 from logging.handlers import RotatingFileHandler
 
-from quart import Quart
+from quart import Quart, render_template
 from markupsafe import escape
 
 from api.smart_device_manager import (
@@ -19,6 +19,9 @@ from api.smart_device_manager import (
 
 
 KB = 1024
+HOSTING_IP_GLOBAL = "0.0.0.0"
+HOSTING_IP_LOCAL = "127.0.0.1"
+INDEX = "index.html"
 
 logger = logging.getLogger("onelight-app")
 logger.setLevel(logging.DEBUG)
@@ -43,27 +46,29 @@ logger.addHandler(console_handler)
 
 app = Quart(__name__)
 
+
 @app.route("/")
 async def index():
-    # TODO: Return a basic HTML page with two clickable buttons:
-    # - button 1: "ON"
-    # - button 2: "OFF"
-    return 'Index page. Nothing to see here...'
+    return await render_template(INDEX)
+
 
 @app.route("/on")
 async def turn_on():
     await turn_on_hs100()
     return "Light turned on!"
 
+
 @app.route("/off")
 async def turn_off():
     await turn_off_hs100()
     return "Light turned off!"
 
+
 @app.route("/hs100_status")
 async def hs100_status():
     return await ping_hs100_device()
 
+
 # Development -- make safer adjustments later
 if __name__ == "__main__":
-    app.run(host='127.0.0.1', port=3000, debug=False)
+    app.run(host=HOSTING_IP_GLOBAL, port=3000, debug=False)
