@@ -44,7 +44,8 @@ from utils import (
     generate_user_id,
     signup_workflow,
     login_workflow,
-    OK_ZERO
+    OK_ZERO,
+    USERNAME_KEY
 )
 
 from database.database import (
@@ -128,8 +129,11 @@ async def signup():
         signup_status_code, info = await signup_workflow(data, db)
 
         if signup_status_code != OK_ZERO:
-            return await render_template(SIGNUP_HTML, error=info)
+            await flash(f"Error: {info}. Please try again")
+            #return await render_template(SIGNUP_HTML, error=info)
+            return redirect(url_for(SIGNUP))
         else:
+            await flash(f"Successfully registered{data.get(USERNAME_KEY, 'Unknown')}, proceeding to login")
             return redirect(url_for(LOGIN))
 
     return await render_template(SIGNUP_HTML)
