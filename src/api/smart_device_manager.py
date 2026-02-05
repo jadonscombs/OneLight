@@ -61,10 +61,17 @@ async def get_hs100_device() -> Optional[Device]:
     """
 
     # Check device cache
-    if len(device_cache[HS100]) != 0:
-        device = await Device.connect(host=list(device_cache[HS100].keys())[0])
-        if isinstance(device, Device):
-            return device
+    if len(device_cache[HS100]) > 0:
+        try:
+            first_hs100_ip = list(device_cache[HS100].keys())[0]
+            device = await Device.connect(host=first_hs100_ip)
+            if isinstance(device, Device):
+                return device
+        except Exception:
+            logger.exception(
+                "Exception attempting to connect to cached HS100 "
+                f"device with IP {first_hs100_ip}"
+            )
 
     # Check for device via broadcast
     ip_broadcast_target = get_hs100_broadcast_ip()
@@ -134,10 +141,11 @@ async def turn_off_hs100(device: Optional[Device] = None):
 async def get_hs100_on_state(device: Optional[Device] = None):
     if device is None:
         device = await get_hs100_device()
-    s = f"{HS100}: "
     if isinstance(device, Device):
-        return f"{s}ON" if device.is_on else f"{s}OFF"
-    return f"{s}UNKNOWN STATE"
+        state = "ON" if device.is_on else "OFF"
+    else:
+        state = "UNKNOWN STATE"
+    return f"{HS100}: {state}"
 
 
 def load_config(json_config_path: pathlib.Path = DEFAULT_CONFIG_PATH):
