@@ -183,3 +183,4 @@ def is_hs100_device(device: Device):
 def update_device_cache(device: Device, is_hs100: bool = False):
     model = HS100 if is_hs100 else UNKNOWN
     device_cache[model][device.host] = device.config.to_dict()
+    logger.debug(f"Updated device cache - is_hs100: {is_hs100}")
