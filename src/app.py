@@ -110,6 +110,44 @@ class ProdConfig(Config):
     HOST = HOSTING_IP_GLOBAL
 
 
+# Ensure env param is supplied
+env = None
+if len(sys.argv) == 1:
+
+    # Try loading env from secrets.ini
+    try:
+        env = get_app_env()
+    except Exception:
+        logger.fatal(
+            "OneLight cannot start without a specified environment! "
+            "Must be 'dev' or 'prod' and you must have configured your "
+            "'secrets.ini' file."
+        )
+        raise RuntimeError(
+            "OneLight cannot start without a specified environment! "
+            "Must be 'dev' or 'prod' and you must have configured your "
+            "'secrets.ini' file."
+        )
+
+# Detect env
+else:
+    env = sys.argv[1]
+    if "env=" in env:
+        env = env[4:].strip()
+        if env.startswith("dev"):
+            env = "dev"
+        elif env.startswith("prod"):
+            env = "prod"
+        else:
+            logger.debug(f"Invalid env CLI param '{env}'")
+            env = "dev"
+    else:
+        logger.debug(f"Invalid env CLI param '{env}'")
+        env = "dev"
+
+logger.debug(f"Using application env '{env}'")
+
+
 # Quart app initialization
 app = Quart(__name__)
 app.config.from_object(ProdConfig)

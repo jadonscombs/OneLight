@@ -248,9 +248,13 @@ def get_secret_key(env: str):
     config.read(config_path)
 
     try:
-        return config["SECRETS"][f"{env}_secret_key"]
+        key = config["SECRETS"][f"{env}_secret_key"]
+        logger.debug(f"Is secret key None? {key is None}")
+        return key
     except Exception:
-        logger.exception(f"Exception returning secret key for env '{env}'")
+        logger.exception(
+            f"Exception returning secret key for env '{env}'. Returning None"
+        )
         return None
 
 
@@ -261,7 +265,9 @@ def get_app_env():
     config.read(config_path)
 
     try:
-        return config["CONFIG"]['env']
+        return config["CONFIG"]["env"]
     except Exception:
-        logger.exception(f"Exception returning env param from '{SECRETS_CONFIG_FILE}' file")
+        logger.exception(
+            f"Exception returning env param from '{SECRETS_CONFIG_FILE}' file"
+        )
         raise
