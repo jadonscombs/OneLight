@@ -37,6 +37,7 @@ class FormValidationCodes(Enum):
     Code EM: Email validation failure
     Code PW: Password validation error
     """
+
     US = 1
     EM = auto()
     PW = auto()
@@ -114,30 +115,21 @@ def is_valid_form_fields(request_form: Any, db: OneLightDB) -> Tuple:
         assert res == OK_ZERO
     except Exception:
         logger.exception(f"Username validation failed (code {res})")
-        return (
-            FormValidationCodes.US.value,
-            FormValidationCodes.US.name
-        )
+        return (FormValidationCodes.US.value, FormValidationCodes.US.name)
     try:
         email: str = request_form.get(EMAIL_KEY)
         res = is_valid_email(email, db)
         assert res == OK_ZERO
     except Exception:
         logger.exception(f"Email validation failed (code {res})")
-        return (
-            FormValidationCodes.EM.value,
-            FormValidationCodes.EM.name
-        )
+        return (FormValidationCodes.EM.value, FormValidationCodes.EM.name)
     try:
         password: str = request_form.get(PASSWORD_KEY)
         res = is_valid_password(password)
         assert res == OK_ZERO
     except Exception:
         logger.exception(f"Password validation failed (code {res})")
-        return (
-            FormValidationCodes.PW.value,
-            FormValidationCodes.PW.name
-        )
+        return (FormValidationCodes.PW.value, FormValidationCodes.PW.name)
 
     logger.info("[OK] Signup form validation complete")
     return (OK_ZERO, "OK")
@@ -165,7 +157,7 @@ async def signup_workflow(request_form: Any, db: OneLightDB) -> Tuple:
         {
             "operation": "validate_signup_form",
             "status": fields_valid_status,
-            "status_name": status_name
+            "status_name": status_name,
         }
     )
 
@@ -178,14 +170,14 @@ async def signup_workflow(request_form: Any, db: OneLightDB) -> Tuple:
     add_account_status_code = db.add_user_account(
         request_form.get(USERNAME_KEY),
         request_form.get(EMAIL_KEY),
-        hash_signup_password(request_form.get(PASSWORD_KEY))
+        hash_signup_password(request_form.get(PASSWORD_KEY)),
     )
     status_name = FormValidationCodes.UAC.name
     logger.debug(
         {
             "operation": "add_new_account",
             "status": add_account_status_code,
-            "status_name": status_name
+            "status_name": status_name,
         }
     )
 
@@ -222,17 +214,18 @@ async def login_workflow(request_form: Any, db: OneLightDB) -> Tuple:
     stored_password_hash: Optional[str] = db.fetch_password_hash_for_username(username)
     is_matching_password: bool = False
     if not stored_password_hash:
-        logger.error(
-            f"Password hash for '{username}' could not be found..."
-        )
+        logger.error(f"Password hash for '{username}' could not be found...")
     else:
         is_matching_password: bool = verify_login_password(
-            password,
-            stored_password_hash
+            password, stored_password_hash
         )
 
     login_fail_message: str = "Invalid username or password, please try again."
     if not is_existing_username or not is_matching_password:
         return (-1, login_fail_message)
+    # Fetch the user's DB record so the caller can bind session to user id
+    user_record = db.fetch_user_by_username(username)
+    if not user_record:
+        return (-1, login_fail_message)
 
-    return (0, f"Welcome {username}, you are now signed in.")
+    return (0, user_record.get("id"))

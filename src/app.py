@@ -20,8 +20,9 @@ from quart import (
     redirect,
     request,
     url_for,
-    session
+    session,
 )
+from quart import abort, jsonify
 from quart_auth import (
     QuartAuth,
     AuthUser,
@@ -35,8 +36,10 @@ from api.smart_device_manager import (
     ping_hs100_device,
     turn_on_hs100,
     turn_off_hs100,
-    get_hs100_on_state
+    get_hs100_on_state,
 )
+
+from api.device_manager import DeviceManager
 
 from utils import (
     is_get,
@@ -45,13 +48,12 @@ from utils import (
     signup_workflow,
     login_workflow,
     OK_ZERO,
-    USERNAME_KEY
+    USERNAME_KEY,
 )
 
-from database.database import (
-    OneLightDB,
-    DATABASE
-)
+from database.database import OneLightDB, DATABASE
+
+from constants import ONELIGHT_LOG_NAME
 
 
 KB = 1024
@@ -69,15 +71,11 @@ POST = "POST"
 GET = "GET"
 METHODS_GET_POST = {GET, POST}
 
-logger = logging.getLogger("onelight-app")
+logger = logging.getLogger(ONELIGHT_LOG_NAME)
 logger.setLevel(logging.DEBUG)
 
-log_fmt = '%(asctime)s - %(name)s - [%(levelname)s] - %(message)s'
-log_handler = RotatingFileHandler(
-    "onelight-app.log",
-    maxBytes=80*KB,
-    backupCount=4
-)
+log_fmt = "%(asctime)s - %(name)s - [%(levelname)s] - %(message)s"
+log_handler = RotatingFileHandler("onelight-app.log", maxBytes=80 * KB, backupCount=4)
 log_handler.setLevel(logging.DEBUG)
 log_handler.setFormatter(logging.Formatter(log_fmt))
 
@@ -96,8 +94,10 @@ class Config:
     DEBUG = False
     SECRET_KEY = "dummy-secret-key"
 
+
 class DevConfig(Config):
     DEBUG = True
+
 
 class ProdConfig(Config):
     SECRET_KEY = "IWBcpxkzttNbEI9Tt91xRA"
@@ -112,11 +112,20 @@ auth_manager = QuartAuth(app)
 db = OneLightDB(app, overwrite_if_exists=False)
 logger.debug(f"DB config lives at: {app.config.get(DATABASE, '')}")
 
+# Device manager instance (uses new device_manager module)
+device_manager = DeviceManager(db)
+
 
 @app.route("/")
 async def index():
-    # NEW: force login/signup before accessing any smart plug controls
-    return redirect(url_for(SIGNUP))
+    # If already logged in, redirect to home
+    if await current_user.is_authenticated:
+        logger.debug(
+            f"Current user authenticated? {await current_user.is_authenticated}"
+        )
+        return redirect(url_for(HOME))
+    # Otherwise show landing page with signup primary and a login option
+    return await render_template("landing.html")
 
 
 @app.route("/signup", methods=METHODS_GET_POST)
@@ -130,10 +139,12 @@ async def signup():
 
         if signup_status_code != OK_ZERO:
             await flash(f"Error: {info}. Please try again")
-            #return await render_template(SIGNUP_HTML, error=info)
+            # return await render_template(SIGNUP_HTML, error=info)
             return redirect(url_for(SIGNUP))
         else:
-            await flash(f"Successfully registered{data.get(USERNAME_KEY, 'Unknown')}, proceeding to login")
+            await flash(
+                f"Successfully registered{data.get(USERNAME_KEY, 'Unknown')}, proceeding to login"
+            )
             return redirect(url_for(LOGIN))
 
     return await render_template(SIGNUP_HTML)
@@ -154,8 +165,13 @@ async def login():
         attempted_login_status, info = await login_workflow(data, db)
         if attempted_login_status == 0:
             # If login success, bring customer to home page
-            login_user(AuthUser(generate_user_id()))
-            logger.info(info)
+            # Bind the authenticated session to the DB user id
+            try:
+                user_id = int(info)
+            except Exception:
+                user_id = info
+            login_user(AuthUser(str(user_id)))
+            logger.info(f"User {user_id} logged in")
             return redirect(url_for(HOME))
         else:
             # If login fail, redirect to login page
@@ -168,30 +184,121 @@ async def login():
 @app.route("/home")
 @login_required
 async def home():
-    # Have the following buttons/options:
-    # ===================================
-    # [My Devices]
-    # [Add New Device]
-    # [Logout]
+    # Render a centered home/dashboard with navigation buttons
+    return await render_template("home.html")
 
-    # For the "My Devices" and "Add New Device" pages, have a "Back" button
 
-    await asyncio.sleep(0)
-    return (
-        "[PLACEHOLDER] Welcome! You are home.\n"
-        f"Your ID: {current_user.auth_id}"
+@app.route("/logout")
+async def logout():
+    logout_user()
+    return redirect(url_for(INDEX))
 
-    )
 
 @app.route("/devices")
 @login_required
 async def my_devices():
-    await asyncio.sleep(0)
-    return "My devices page."
+    # List devices for current user
+    try:
+        owner_id = int(current_user.auth_id)
+    except Exception:
+        owner_id = current_user.auth_id
+    devices = db.get_devices_for_user(owner_id)
+    # Render devices dashboard (template to be created)
+    return await render_template("devices.html", devices=devices)
+
+
+def _ensure_device_owner(device_id: int, owner_id: int):
+    device = db.get_device_by_id(device_id)
+    if not device:
+        abort(404, "Device not found")
+    if int(device.get("owner_id")) != int(owner_id):
+        abort(403, "Forbidden")
+    return device
+
+
+@app.route("/devices/add")
+@login_required
+async def add_device_page():
+    return await render_template("add_device.html")
+
+
+@app.route("/devices/scan", methods={GET, POST})
+@login_required
+async def devices_scan():
+    # Trigger network discovery via DeviceManager
+    data = None
+    try:
+        discovered = await device_manager.discover(timeout=5)
+        return jsonify({"candidates": discovered})
+    except Exception as exc:
+        logger.exception("Error during device discovery")
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/devices/register", methods={POST})
+@login_required
+async def devices_register():
+    # Accept JSON body or form data
+    payload = await request.get_json(silent=True)
+    if not payload:
+        form = await request.form
+        payload = {k: form.get(k) for k in form.keys()}
+
+    name = payload.get("name") or payload.get("device_name") or "Unnamed Device"
+    owner_id = int(current_user.auth_id)
+    # discovery_record may be included directly or built from fields
+    discovery_record = payload.get("discovery") or {
+        "ip": payload.get("ip"),
+        "mac": payload.get("mac"),
+        "model": payload.get("model"),
+    }
+    try:
+        device_id = await device_manager.provision(discovery_record, owner_id, name)
+        if device_id and device_id != -1:
+            return jsonify({"device_id": device_id})
+        return jsonify({"error": "Provision failed"}), 500
+    except Exception as exc:
+        logger.exception("Error provisioning device")
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/devices/<int:device_id>")
+@login_required
+async def device_detail(device_id: int):
+    owner_id = int(current_user.auth_id)
+    device = _ensure_device_owner(device_id, owner_id)
+    return await render_template("device_detail.html", device=device)
+
+
+@app.route("/devices/<int:device_id>/on", methods={POST})
+@login_required
+async def device_turn_on(device_id: int):
+    owner_id = int(current_user.auth_id)
+    _ensure_device_owner(device_id, owner_id)
+    try:
+        await device_manager.turn_on(device_id)
+        return jsonify({"status": "ok"})
+    except Exception as exc:
+        logger.exception("Error turning device on")
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/devices/<int:device_id>/off", methods={POST})
+@login_required
+async def device_turn_off(device_id: int):
+    owner_id = int(current_user.auth_id)
+    _ensure_device_owner(device_id, owner_id)
+    try:
+        await device_manager.turn_off(device_id)
+        return jsonify({"status": "ok"})
+    except Exception as exc:
+        logger.exception("Error turning device off")
+        return jsonify({"error": str(exc)}), 500
 
 
 # WARNING: ROUTES BELOW HERE NEED TO BE REFACTORED SINCE WE ARE
 # CONTROLLING DEVICES THROUGH THE DEVICES PAGE...
+
 
 @app.route("/on")
 async def turn_on():

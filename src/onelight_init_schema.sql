@@ -1,37 +1,36 @@
 /*
-TABLE: devices
-    id:
-    name:
-    model:
-    owner:
-
-
-TABLE: users
-    id:
-    username:
-    email:
-    password_hash:
-
-
-Notes:
-- Ownership of each smart device is indicated by 'owner' field in Devices table
+OneLight initial schema (revised)
+This schema defines users and devices for the OneLight application.
+Note: the application expects a fresh DB; no migration logic is applied.
 */
 
+PRAGMA foreign_keys = ON;
 
-DROP Table IF EXISTS users;
 DROP TABLE IF EXISTS devices;
+DROP TABLE IF EXISTS users;
 
-CREATE TABLE users (
-    id INTEGER PRIMARY KEY,
-    username VARCHAR(50) NOT NULL,
-    email VARCHAR(80) NOT NULL,
-    password_hash VARCHAR(255) NOT NULL
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE devices (
-    id INTEGER PRIMARY KEY,
-    'name' VARCHAR(75) NOT NULL,
-    model VARCHAR(50) NOT NULL,
-    'owner' VARCHAR(75) NOT NULL,
-    FOREIGN KEY ('owner') REFERENCES users(username)
+CREATE TABLE IF NOT EXISTS devices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    model TEXT NOT NULL,
+    owner_id INTEGER NOT NULL,
+    ip TEXT,
+    mac TEXT,
+    status TEXT,
+    last_seen TIMESTAMP,
+    provisioned INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+-- Indexes for common lookups
+CREATE INDEX IF NOT EXISTS idx_devices_owner ON devices(owner_id);
+CREATE INDEX IF NOT EXISTS idx_devices_mac ON devices(mac);

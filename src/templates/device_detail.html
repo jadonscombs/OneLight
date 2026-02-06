@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Device Detail</title>
+  </head>
+  <body>
+    <h1>Device: {{ device.name }}</h1>
+    <p>Model: {{ device.model }}</p>
+    <p>IP: {{ device.ip }}</p>
+    <p>MAC: {{ device.mac }}</p>
+    <p>Status: <span id="status">{{ device.status or 'unknown' }}</span></p>
+    <p>Last seen: {{ device.last_seen }}</p>
+
+    <button id="onBtn">Turn On</button>
+    <button id="offBtn">Turn Off</button>
+    <p><a href="/devices">Back</a></p>
+
+    <script>
+    const deviceId = {{ device.id }};
+    document.getElementById('onBtn').addEventListener('click', async () => {
+      const r = await fetch(`/devices/${deviceId}/on`, { method: 'POST' });
+      const j = await r.json();
+      if (j.status === 'ok') document.getElementById('status').textContent = 'on';
+      else alert('Error: ' + (j.error || r.statusText));
+    });
+    document.getElementById('offBtn').addEventListener('click', async () => {
+      const r = await fetch(`/devices/${deviceId}/off`, { method: 'POST' });
+      const j = await r.json();
+      if (j.status === 'ok') document.getElementById('status').textContent = 'off';
+      else alert('Error: ' + (j.error || r.statusText));
+    });
+    </script>
+  </body>
+</html>

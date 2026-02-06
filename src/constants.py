@@ -1,0 +1,1 @@
+ONELIGHT_LOG_NAME = "onelight-app"

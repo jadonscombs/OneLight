@@ -1,15 +1,28 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OneLight Sign Up</title>
-</head>
-
-<body>
-
-    <h2>Sign Up</h2>
-
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>OneLight — Sign Up</title>
+    <style>
+      body { margin:0; font-family: Arial, sans-serif; background:#1d1d24; color:#fff; }
+      .center { display:flex; align-items:center; justify-content:center; min-height:100vh; }
+      .card { text-align:center; background:rgba(255,255,255,0.04); padding:32px; border-radius:12px; box-shadow: 0 6px 20px rgba(0,0,0,0.6); width:100%; max-width:400px; }
+      .back { margin-bottom:20px; }
+      .back a { color:#cce056; text-decoration:none; font-size:13px; }
+      .back a:hover { opacity:0.8; }
+      h1 { margin:0 0 24px 0; font-size:24px; }
+      form { display:flex; flex-direction:column; gap:14px; }
+      .form-group { display:flex; flex-direction:column; gap:4px; text-align:left; }
+      label { font-size:12px; color:#ccc; }
+      input[type="text"], input[type="email"], input[type="password"] { padding:10px 12px; border:1px solid rgba(204,224,86,0.2); background:rgba(255,255,255,0.05); color:#fff; border-radius:6px; font-size:14px; }
+      input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focus { outline:none; border-color:#cce056; background:rgba(204,224,86,0.05); }
+      input[type="text"]::placeholder, input[type="email"]::placeholder, input[type="password"]::placeholder { color:#888; }
+      input[type="submit"] { background:#cce056; color:#111; border:none; padding:10px 20px; border-radius:6px; cursor:pointer; font-weight:600; font-size:14px; margin-top:10px; }
+      input[type="submit"]:hover { opacity:0.9; }
+    </style>
+  </head>
+  <body>
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             {% for category, message in messages %}
@@ -19,19 +32,26 @@
             {% endfor %}
         {% endif %}
     {% endwith %}
-
-    <form method="POST">
-        <label>Username:</label><br>
-        <input name="username" required><br><br>
-
-        <label>Email:</label><br>
-        <input name="email" type="email" required><br><br>
-
-        <label>Password:</label><br>
-        <input name="password" type="password" required><br><br>
-        
-        <input type="submit" value="SIGN ME UP :^)">
-    </form>
-
-</body>
+    <div class="center">
+      <div class="card">
+        <div class="back"><a href="/">← Back</a></div>
+        <h1>Create Account</h1>
+        <form method="POST">
+          <div class="form-group">
+            <label>Username</label>
+            <input type="text" name="username" required placeholder="Choose a username" />
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" name="email" required placeholder="your@email.com" />
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" name="password" required placeholder="8+ chars, mixed case, special char & number" />
+          </div>
+          <input type="submit" value="Sign me up! :^)" />
+        </form>
+      </div>
+    </div>
+  </body>
 </html>

@@ -1,0 +1,104 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Add Device</title>
+    <style>
+      body { margin:0; font-family: Arial, sans-serif; background:#1d1d24; color:#fff; padding:20px; }
+      .container { max-width:600px; margin:0 auto; }
+      .back { margin-bottom:20px; }
+      .back a { color:#cce056; text-decoration:none; }
+      .back a:hover { opacity:0.8; }
+      h1 { font-size:28px; margin:0 0 30px 0; }
+      .section { background:rgba(255,255,255,0.04); padding:20px; border-radius:8px; margin-bottom:20px; }
+      .section h2 { margin:0 0 16px 0; font-size:16px; }
+      button[type="button"], button[type="submit"] { background:#cce056; color:#111; border:none; padding:10px 20px; border-radius:6px; cursor:pointer; font-weight:600; font-size:14px; }
+      button[type="button"]:hover, button[type="submit"]:hover { opacity:0.9; }
+      #scanBtn:disabled { opacity:0.6; cursor:not-allowed; }
+      #candidates { margin-top:16px; display:flex; flex-direction:column; gap:10px; }
+      .candidate { background:rgba(204,224,86,0.08); padding:12px; border-radius:4px; border-left:2px solid #cce056; display:flex; justify-content:space-between; align-items:center; }
+      .candidate-info { font-size:13px; }
+      .candidate button { background:transparent; color:#cce056; border:1px solid rgba(204,224,86,0.3); padding:6px 12px; font-size:12px; margin-top:0; }
+      .candidate button:hover { background:rgba(204,224,86,0.1); }
+      form { display:flex; flex-direction:column; gap:12px; margin-top:16px; }
+      label { display:block; font-size:13px; margin-bottom:4px; }
+      input { padding:8px; border:1px solid rgba(204,224,86,0.2); background:rgba(255,255,255,0.05); color:#fff; border-radius:4px; font-size:13px; }
+      input:focus { outline:none; border-color:#cce056; background:rgba(204,224,86,0.05); }
+      .message { text-align:center; padding:20px; color:#aaa; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="back"><a href="/devices">← Back to Devices</a></div>
+      <h1>Add Device</h1>
+
+      <div class="section">
+        <h2>Scan for devices</h2>
+        <p style="font-size:13px; color:#aaa; margin:0 0 12px 0;">Put a Kasa plug into factory/AP provisioning mode and click Scan to discover it on your network.</p>
+        <button type="button" id="scanBtn">Scan for devices</button>
+        <div id="candidates"></div>
+      </div>
+
+      <div class="section">
+        <h2>Manual add</h2>
+        <form id="manualForm">
+          <label>Device name <input name="name" required placeholder="e.g., Living Room Plug" /></label>
+          <label>IP address (optional) <input name="ip" placeholder="192.168.1.100" /></label>
+          <label>MAC address (optional) <input name="mac" placeholder="XX:XX:XX:XX:XX:XX" /></label>
+          <label>Model (optional) <input name="model" placeholder="HS100" /></label>
+          <button type="submit">Add Device</button>
+        </form>
+      </div>
+    </div>
+
+    <script>
+    document.getElementById('scanBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('scanBtn');
+      btn.disabled = true;
+      btn.textContent = 'Scanning...';
+      const res = await fetch('/devices/scan', { method: 'POST' });
+      const json = await res.json();
+      btn.disabled = false;
+      btn.textContent = 'Scan';
+      const container = document.getElementById('candidates');
+      container.innerHTML = '';
+      if (json.candidates && json.candidates.length) {
+        json.candidates.forEach((c, i) => {
+          const div = document.createElement('div');
+          div.innerHTML = `<strong>${c.model || 'unknown'}</strong> @ ${c.ip} (mac: ${c.mac || 'n/a'}) <button>Register</button>`;
+          div.querySelector('button').addEventListener('click', async () => {
+            const payload = { name: c.model || 'Kasa Device', discovery: c };
+            const r = await fetch('/devices/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            const jr = await r.json();
+            if (jr.device_id) {
+              alert('Registered device id: ' + jr.device_id);
+              window.location.href = '/devices';
+            } else {
+              alert('Register failed: ' + (jr.error || r.statusText));
+            }
+          });
+          container.appendChild(div);
+        });
+      } else if (json.error) {
+        container.textContent = 'Error: ' + json.error;
+      } else {
+        container.textContent = 'No devices found.';
+      }
+    });
+
+    document.getElementById('manualForm').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const form = ev.target;
+      const data = { name: form.name.value, ip: form.ip.value, mac: form.mac.value, model: form.model.value };
+      const r = await fetch('/devices/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      const jr = await r.json();
+      if (jr.device_id) {
+        window.location.href = '/devices';
+      } else {
+        alert('Add failed: ' + (jr.error || r.statusText));
+      }
+    });
+    </script>
+  </body>
+</html>
