@@ -49,18 +49,17 @@ from utils import (
     get_app_env,
     signup_workflow,
     login_workflow,
+    update_app_config,
     OK_ZERO,
     USERNAME_KEY,
 )
 
 from database.database import OneLightDB, DATABASE
 
-from constants import ONELIGHT_LOG_NAME
+from constants import ONELIGHT_LOG_NAME, HOSTING_IP_GLOBAL, HOSTING_IP_LOCAL
 
 
 KB = 1024
-HOSTING_IP_GLOBAL = "0.0.0.0"
-HOSTING_IP_LOCAL = "127.0.0.1"
 INDEX_HTML = "index.html"
 LOGIN_HTML = "login.html"
 SIGNUP_HTML = "signup.html"
@@ -92,65 +91,32 @@ logger.addHandler(console_handler)
 
 
 # Add global config classes
-class Config:
-    DEBUG = False
-    SECRET_KEY = None
+# class Config:
+#     DEBUG = False
+#     SECRET_KEY = None
 
 
-class DevConfig(Config):
-    DEBUG = True
-    ENV = "dev"
-    SECRET_KEY = get_secret_key(ENV)
-    HOST = HOSTING_IP_LOCAL
+# class DevConfig(Config):
+#     DEBUG = True
+#     ENV = "dev"
+#     SECRET_KEY = get_secret_key(ENV)
+#     HOST = HOSTING_IP_LOCAL
 
 
-class ProdConfig(Config):
-    ENV = "prod"
-    SECRET_KEY = get_secret_key(ENV)
-    HOST = HOSTING_IP_GLOBAL
-
-
-# Ensure env param is supplied
-env = None
-if len(sys.argv) == 1:
-
-    # Try loading env from secrets.ini
-    try:
-        env = get_app_env()
-    except Exception:
-        logger.fatal(
-            "OneLight cannot start without a specified environment! "
-            "Must be 'dev' or 'prod' and you must have configured your "
-            "'secrets.ini' file."
-        )
-        raise RuntimeError(
-            "OneLight cannot start without a specified environment! "
-            "Must be 'dev' or 'prod' and you must have configured your "
-            "'secrets.ini' file."
-        )
-
-# Detect env
-else:
-    env = sys.argv[1]
-    if "env=" in env:
-        env = env[4:].strip()
-        if env.startswith("dev"):
-            env = "dev"
-        elif env.startswith("prod"):
-            env = "prod"
-        else:
-            logger.debug(f"Invalid env CLI param '{env}'")
-            env = "dev"
-    else:
-        logger.debug(f"Invalid env CLI param '{env}'")
-        env = "dev"
-
-logger.debug(f"Using application env '{env}'")
+# class ProdConfig(Config):
+#     ENV = "prod"
+#     SECRET_KEY = get_secret_key(ENV)
+#     HOST = HOSTING_IP_GLOBAL
 
 
 # Quart app initialization
 app = Quart(__name__)
-app.config.from_object(ProdConfig)
+
+# Fetch env, update app config
+env = get_app_env(sys_argv=sys.argv)
+update_app_config(app, env)
+
+# app.config.from_object(ProdConfig)
 auth_manager = QuartAuth(app)
 
 # Database setup
@@ -163,11 +129,11 @@ device_manager = DeviceManager(db)
 
 @app.route("/")
 async def index():
+    user_is_authenticated = await current_user.is_authenticated
+    logger.debug(f"Current user authenticated? {user_is_authenticated}")
+
     # If already logged in, redirect to home
-    if await current_user.is_authenticated:
-        logger.debug(
-            f"Current user authenticated? {await current_user.is_authenticated}"
-        )
+    if user_is_authenticated:
         return redirect(url_for(HOME))
     # Otherwise show landing page with signup primary and a login option
     return await render_template("landing.html")
@@ -188,7 +154,7 @@ async def signup():
             return redirect(url_for(SIGNUP))
         else:
             await flash(
-                f"Successfully registered{data.get(USERNAME_KEY, 'Unknown')}, proceeding to login"
+                f"Successfully registered {data.get(USERNAME_KEY, 'Unknown')}, proceeding to login"
             )
             return redirect(url_for(LOGIN))
 
@@ -369,7 +335,4 @@ async def hs100_state():
 
 # Development -- make safer adjustments later
 if __name__ == "__main__":
-
-    # Get proper host
-    host = DevConfig.HOST if env == "dev" else ProdConfig.HOST
-    app.run(host=host)
+    app.run(host=app.config.get("HOST", '127.0.0.1'))  # Default to local

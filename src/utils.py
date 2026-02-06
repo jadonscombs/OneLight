@@ -6,17 +6,25 @@ import configparser
 import logging
 import re
 import string
+import sys
 import uuid
 from enum import Enum, auto
 from pathlib import Path
-from typing import Any, Optional, Tuple
+from typing import Any, Literal, Optional, Tuple
 
 import bcrypt
-from quart import Request
+from quart import Quart, Request
 
 from database.database import OneLightDB
 
-from constants import SECRETS_CONFIG_FILE
+from constants import (
+    SECRETS_CONFIG_FILE,
+    DEV_ENV,
+    ENV_KEY,
+    PROD_ENV,
+    HOSTING_IP_LOCAL,
+    HOSTING_IP_GLOBAL,
+)
 
 
 logger = logging.getLogger("onelight-app")
@@ -241,7 +249,7 @@ def get_secret_key(env: str):
         assert env in ("dev", "prod")
     except AssertionError:
         logger.error(f"Invalid application environment ('{env}')")
-        return None
+        raise
 
     config_path = Path(SECRETS_CONFIG_FILE).resolve()
     config = configparser.ConfigParser()
@@ -255,19 +263,57 @@ def get_secret_key(env: str):
         logger.exception(
             f"Exception returning secret key for env '{env}'. Returning None"
         )
-        return None
+        raise
 
 
 # Config helper
-def get_app_env():
+def get_app_env(sys_argv=None):
     config_path = Path(SECRETS_CONFIG_FILE)
     config = configparser.ConfigParser()
     config.read(config_path)
 
     try:
         return config["CONFIG"]["env"]
+    except KeyError:
+        env = sys.argv[1]
+        if "env=" in env:
+            env = env[4:].strip()
+            if env.startswith("dev"):
+                env = "dev"
+            elif env.startswith("prod"):
+                env = "prod"
+            else:
+                logger.debug(f"Invalid env CLI param '{env}'")
+                env = "dev"
+        else:
+            logger.debug(f"Invalid env CLI param '{env}'")
+            env = "dev"
     except Exception:
         logger.exception(
             f"Exception returning env param from '{SECRETS_CONFIG_FILE}' file"
         )
         raise
+
+
+# Update app config based on env
+def update_app_config(app: Quart, env: Optional[str]):
+    logger.debug(f"Using application env '{env}'")
+
+    if env == PROD_ENV:
+        app.config.update(
+            ENV=PROD_ENV,
+            SECRET_KEY=get_secret_key(env),
+            HOST=HOSTING_IP_GLOBAL,
+            QUART_AUTH_COOKIE_SECURE=False,  # Needed to bypass HTTPS req.
+        )
+    elif env == DEV_ENV:
+        app.config.update(
+            DEBUG=True,
+            ENV=DEV_ENV,
+            SECRET_KEY=get_secret_key(env),
+            HOST=HOSTING_IP_LOCAL,
+        )
+    else:
+        raise RuntimeError(
+            f"Invalid app environment supplied: '{env}' (type={type(env)})"
+        )
