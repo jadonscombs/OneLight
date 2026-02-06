@@ -16,6 +16,8 @@ from quart import Request
 
 from database.database import OneLightDB
 
+from constants import SECRETS_CONFIG_FILE
+
 
 logger = logging.getLogger("onelight-app")
 
@@ -241,7 +243,7 @@ def get_secret_key(env: str):
         logger.error(f"Invalid application environment ('{env}')")
         return None
 
-    config_path = Path("secrets.ini").resolve()
+    config_path = Path(SECRETS_CONFIG_FILE).resolve()
     config = configparser.ConfigParser()
     config.read(config_path)
 
@@ -250,3 +252,16 @@ def get_secret_key(env: str):
     except Exception:
         logger.exception(f"Exception returning secret key for env '{env}'")
         return None
+
+
+# Config helper
+def get_app_env():
+    config_path = Path(SECRETS_CONFIG_FILE)
+    config = configparser.ConfigParser()
+    config.read(config_path)
+
+    try:
+        return config["CONFIG"]['env']
+    except Exception:
+        logger.exception(f"Exception returning env param from '{SECRETS_CONFIG_FILE}' file")
+        raise
