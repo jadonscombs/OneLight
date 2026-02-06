@@ -4,8 +4,8 @@ Project OneLight.
 Application entry point.
 """
 
-import asyncio
 import logging
+import sys
 from logging.handlers import RotatingFileHandler
 from markupsafe import escape
 from secrets import compare_digest
@@ -45,6 +45,7 @@ from utils import (
     is_get,
     is_post,
     generate_user_id,
+    get_secret_key,
     signup_workflow,
     login_workflow,
     OK_ZERO,
@@ -92,20 +93,25 @@ logger.addHandler(console_handler)
 # Add global config classes
 class Config:
     DEBUG = False
-    SECRET_KEY = "dummy-secret-key"
+    SECRET_KEY = None
 
 
 class DevConfig(Config):
     DEBUG = True
+    ENV = "dev"
+    SECRET_KEY = get_secret_key(ENV)
+    HOST = HOSTING_IP_LOCAL
 
 
 class ProdConfig(Config):
-    SECRET_KEY = "IWBcpxkzttNbEI9Tt91xRA"
+    ENV = "prod"
+    SECRET_KEY = get_secret_key(ENV)
+    HOST = HOSTING_IP_GLOBAL
 
 
 # Quart app initialization
 app = Quart(__name__)
-app.config.from_object(DevConfig)
+app.config.from_object(ProdConfig)
 auth_manager = QuartAuth(app)
 
 # Database setup
@@ -324,4 +330,37 @@ async def hs100_state():
 
 # Development -- make safer adjustments later
 if __name__ == "__main__":
-    app.run()
+
+    # Ensure env param is supplied
+    if len(sys.argv) != 2:
+        logger.fatal(
+            "OneLight cannot start without a specified environment! "
+            "Must be 'dev' or 'prod' and you must have configured your "
+            "'secrets.ini' file."
+        )
+        raise RuntimeError(
+            "OneLight cannot start without a specified environment! "
+            "Must be 'dev' or 'prod' and you must have configured your "
+            "'secrets.ini' file."
+        )
+
+    # Detect env
+    env = sys.argv[1]
+    if "env=" in env:
+        env = env[4:].strip()
+        if env.startswith("dev"):
+            env = "dev"
+        elif env.startswith("prod"):
+            env = "prod"
+        else:
+            logger.debug(f"Invalid env CLI param '{env}'")
+            env = "dev"
+    else:
+        logger.debug(f"Invalid env CLI param '{env}'")
+        env = "dev"
+
+    logger.debug(f"Using application env '{env}'")
+
+    # Get proper host
+    host = DevConfig.HOST if env == "dev" else ProdConfig.HOST
+    app.run(host=host)

@@ -2,11 +2,13 @@
 Docstring for src.utils
 """
 
+import configparser
 import logging
 import re
 import string
 import uuid
 from enum import Enum, auto
+from pathlib import Path
 from typing import Any, Optional, Tuple
 
 import bcrypt
@@ -229,3 +231,22 @@ async def login_workflow(request_form: Any, db: OneLightDB) -> Tuple:
         return (-1, login_fail_message)
 
     return (0, user_record.get("id"))
+
+
+# Config helper
+def get_secret_key(env: str):
+    try:
+        assert env in ("dev", "prod")
+    except AssertionError:
+        logger.error(f"Invalid application environment ('{env}')")
+        return None
+
+    config_path = Path("secrets.ini").resolve()
+    config = configparser.ConfigParser()
+    config.read(config_path)
+
+    try:
+        return config["SECRETS"][f"{env}_secret_key"]
+    except Exception:
+        logger.exception(f"Exception returning secret key for env '{env}'")
+        return None

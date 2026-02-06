@@ -218,3 +218,4 @@ __marimo__/
 # Custom ignores
 .ignore*
 *.db
+*.ini
